@@ -12,9 +12,9 @@ This paper asks whether wider search can worsen deployment when the selection sc
 - [Source and verification instructions](source/README.md)
 - [Reproduction scope](source/REPRODUCTION_DETAILS.md)
 
-The primary fitted gap slopes are positive in all 16 pool-by-capital cells. The joint selection--evaluation interval includes zero. All tested non-oracle rules have negative mean net Sharpe on the comparison grid. The paper reports negative cases and the limits of the execution model. It does not establish profitability or a stable effect on another market path.
+The primary fitted gap slopes are positive in all 16 pool-by-capital cells. The joint selection-evaluation interval for pool B's capacity component at USD 500 million includes zero. All tested non-oracle rules have negative mean net Sharpe on the comparison grid. The paper reports negative cases and the limits of the execution model. It does not establish profitability or a stable effect on another market path.
 
-This package contains retained aggregates, ticker identifiers, figure inputs, document sources, and verification scripts. It does not contain raw vendor prices or the complete simulator. The checks reproduce aggregate calculations and the figure. They do not replay the raw market study. No new license grant for external data is asserted.
+This package contains retained aggregates, ticker identifiers, figure inputs, document sources, and verification scripts. It does not contain raw vendor prices or the complete simulator. The scripts check principal aggregate values and regenerate the figure. They do not replay the raw market study. No new license grant for external data is asserted.
 
 To check the supplied evidence:
 

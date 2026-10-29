@@ -103,7 +103,7 @@ The search-induced gap is positive in all 16 primary cells (Table~\ref{tab:prima
 To separate the fixed spread from capacity effects, evaluate four paths in a fixed order: uncapped gross, capped gross, capped with spread, and capped with spread and impact. Adjacent differences in Sharpe slopes sum to the total search-induced gap. The capping and impact terms together form the \emph{capacity component}, denoted $\Gamma_{\rm cap}$ in Supporting Methods. This term measures the part associated with limited trading volume and size-dependent charges. It ranges from $0.0172$ to $0.0460$ per doubling at USD 500 million. The decomposition depends on the path order; it is not a unique attribution of cash costs.
 
 \subsection{Uncertainty in selection changes the conclusion}
-At USD 500 million, pool B has the largest estimated capacity component, $0.0460$, and is the reference bootstrap case. When selection and evaluation periods are resampled jointly and ranks are recomputed, its 95\% percentile interval at USD 500 million is $[-0.0219,0.1209]$; 88\% of replicates are positive. Thus the capacity component is not statistically established under selection uncertainty. The gross slope's joint interval also includes zero, $[-0.0438,0.0678]$.
+At USD 500 million, pool B has the largest estimated capacity component, $0.0460$, and is the reference bootstrap case. When selection and evaluation periods are resampled jointly and ranks are recomputed, its 95\% percentile interval is $[-0.0219,0.1209]$; 88\% of replicates are positive. Thus the capacity component is not statistically established under selection uncertainty. The gross slope's joint interval also includes zero, $[-0.0438,0.0678]$.
 
 These stationary block bootstraps resample consecutive groups of days, with 1,000 replicates and mean block length 21. Selection and evaluation windows are resampled separately. Within each window, all candidates use the same day indices. Holding the ranking fixed and resampling only evaluation gives the narrower capacity-component interval $[0.0383,0.0551]$. It answers a different question, conditional on the observed ranking. Joint intervals also include zero at the other retained block lengths and at USD 25 and 100 million. Supporting Methods Section 4 gives the full uncertainty specification.
 
@@ -132,7 +132,7 @@ Walk-forward & Six time periods & $[-0.0096,0.2418]$ & Seven of 72 cells across 
 Liquidity & Three retrospective terciles & Low $0.0968$; middle $-0.0279$; high $0.0334$ & Middle tercile reverses at all three capitals\\
 \bottomrule
 \end{tabular}
-\caption{Sensitivity ranges and reversals. These settings reuse market data and candidates; cell counts do not represent independent confirmations. Walk-forward selection windows are disjoint, but earlier evaluation dates can enter later selection windows. Supporting Methods Section 4 explains the checks. The complete capital-specific rows are in \texttt{finance\_additional\_checks.json}.}
+\caption{Sensitivity ranges and reversals. These settings reuse market data and candidates; cell counts do not represent independent confirmations. Walk-forward selection windows are disjoint, but earlier evaluation dates can enter later selection windows. Supporting Methods Section 4 explains the checks. The complete capital-specific rows are in \texttt{data/finance\_additional\_checks.json}.}
 \label{tab:sensitivity}
 \end{table}
 
