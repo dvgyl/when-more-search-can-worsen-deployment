@@ -1,0 +1,31 @@
+\begin{table}[t]
+\centering
+\caption{Raw base features in stored order. Each is transformed to a daily percentile rank minus one half. Rolling means, sample standard deviations, maxima, covariances, and variances use full named windows. The symbol $\beta_{it}$ in the residual formula denotes the raw rolling beta, before its rank transform.}
+\label{tab:features}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+Name & Raw formula through close $t$\\
+\midrule
+\texttt{mom21} & $\ell_{it}-\ell_{i,t-21}$\\
+\texttt{mom63} & $\ell_{it}-\ell_{i,t-63}$\\
+\texttt{mom126} & $\ell_{i,t-21}-\ell_{i,t-126}$\\
+\texttt{mom252} & $\ell_{i,t-21}-\ell_{i,t-252}$\\
+\texttt{rev1} & $r_{it}$\\
+\texttt{rev5} & $\ell_{it}-\ell_{i,t-5}$\\
+\texttt{vol21} & $s_{21,t}(r_i)$\\
+\texttt{vol63} & $s_{63,t}(r_i)$\\
+\texttt{ladv} & $\log\max(V_{it},1)$\\
+\texttt{dvolz} & $\log\max(V_{it},1)-\overline{\log\max(V_i,1)}_{63,t}$\\
+\texttt{amihud} & $10^9\,\overline{|r_i|/\max(V_i,1)}_{21,t}$\\
+\texttt{p52w} & $P_{it}/\max_{252,t}(P_i)$\\
+\texttt{beta} & $\beta_{it}=\operatorname{Cov}_{252,t}(r_i,m)/\operatorname{Var}_{252,t}(m)$\\
+\texttt{ivol} & $s_{63,t}(r_i-\beta_i m)$\\
+\texttt{skew63} & $\operatorname{Skew}_{63,t}(r_i)$\\
+\texttt{maxr21} & $\max_{21,t}(r_i)$\\
+\texttt{ma50} & $P_{it}/\overline P_{i,50,t}$\\
+\texttt{ma200} & $\overline P_{i,50,t}/\overline P_{i,200,t}$\\
+\texttt{accel} & $(\ell_{it}-\ell_{i,t-21})-(\ell_{it}-\ell_{i,t-63})/3$\\
+\bottomrule
+\end{tabular}
+\end{table}

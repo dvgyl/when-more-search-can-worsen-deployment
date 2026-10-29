@@ -1,0 +1,42 @@
+{
+  "finance_slopes.csv": {
+    "sha256": "b519406bd6f5ff56a75f904da4df6d01ff36bda466c5b06115525421b9f4725f",
+    "description": "Retained primary finance slopes and levels."
+  },
+  "finance_bootstrap.csv": {
+    "sha256": "84ad93b1cbfaf037a4683102ad34a35346dea5ac9986959fbb4dab389d30b6f1",
+    "description": "Retained finance block-bootstrap summaries."
+  },
+  "finance_remedy_bootstrap.json": {
+    "sha256": "ca77a7301efd86ecb9d84e09d7cd7ad9b50c1ad6751dccb15d9a8e224f7fe0b2",
+    "description": "Retained paired selector-gain bootstrap summaries."
+  },
+  "finance_late_grid.json": {
+    "sha256": "1b9fd9e2c5a3fc7d37166778ede6c9704e0b600fc3c56e49e24fedfe32e3da62",
+    "description": "Retained pool-A late-grid slope differences."
+  },
+  "finance_additional_checks.json": {
+    "sha256": "869a69f0d3c800dc7e34086dcb7010a30e43b25facc3f24744eb2d9b1f8e2695",
+    "description": "Retained finance selector and sensitivity aggregates."
+  },
+  "finance_figure_pool_B_candidates.csv": {
+    "sha256": "9f16917a405d0f70b4f08754dcf6800175969fbdb81f2fbedc83cea3ea45ce26",
+    "description": "Retained finance mechanism figure input."
+  },
+  "finance_figure_pool_B_deciles.csv": {
+    "sha256": "40b2f8082fadeb0323741374e560ae04a32f231ad09f0e34318ae13c80ee5c57",
+    "description": "Retained finance mechanism figure input."
+  },
+  "finance_figure_rank_bins.csv": {
+    "sha256": "6d636b8b861c6a0e664c23443f6f58242e869feaf152e5850c0f8c7253691e22",
+    "description": "Retained finance mechanism figure input."
+  },
+  "finance_figure_rank_gradient_16_32.csv": {
+    "sha256": "9e4980a0a6cbc86d5096027683999f5470d42402a1f5c82bdd9feec4b178234e",
+    "description": "Retained finance mechanism figure input."
+  },
+  "finance_universe.csv": {
+    "sha256": "67333905030707d7adbf3fbe41117af859eaa3c69a0c2a2e2ca72d03acd74cbd",
+    "description": "Retained universe ticker identifiers in panel-column order. No market-data arrays."
+  }
+}

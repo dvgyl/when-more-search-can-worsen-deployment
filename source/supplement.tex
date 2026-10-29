@@ -1,0 +1,283 @@
+\documentclass[10pt,letterpaper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm,booktabs,longtable,array,microtype}
+\usepackage[round,authoryear]{natbib}
+\usepackage{xurl}
+\usepackage{placeins}
+\usepackage[hidelinks]{hyperref}
+\hypersetup{pdftitle={Supporting methods: When More Search Can Worsen Deployment: Best-of-N Selection on an Incomplete Proxy},pdfauthor={Dev D. Goyal}}
+\newcommand{\E}{\mathbb E}
+\newcommand{\Prb}{\mathbb P}
+\newcommand{\ind}{\mathbf 1}
+\title{Supporting methods for\\When More Search Can Worsen Deployment:\\Best-of-$N$ Selection on an Incomplete Proxy}
+\author{Dev D. Goyal}
+\date{}
+\begin{document}
+\maketitle
+\noindent This supplement specifies the trading simulation and the finite-pool calculations used in the paper. Sections~\ref{sec:data}--\ref{sec:execution} give the data, forecasts, and execution model. Section~\ref{sec:uncertainty} gives the selection rules, resampling procedures, and sensitivity results. Section~\ref{sec:status} states the study's retrospective limits. The source package includes aggregate results. It does not redistribute the vendor price records.
+
+\section{Finance data and feature construction}\label{sec:data}
+The daily bars came from the Yahoo Finance chart endpoint, \url{https://query1.finance.yahoo.com/v8/finance/chart/}. The retained snapshot ends on 24 July 2026. The download starts on 1 January 1998. The stored analysis panel starts on 4 January 1999. Its fixed universe contains 258 US equity tickers. The retained downloader starts from a fixed list of 347 identifiers. The inspected scripts do not give an external constituent source for that initial list. The original panel retains names with more than 90\% nonmissing adjusted-price coverage from 1 January 2009 through the retained endpoint. The extended panel preserves that original ticker set. The exact 258 identifiers, in panel order, are in \texttt{data/finance\_universe.csv}. This is a survivor-filtered universe. It does not reconstruct all historical index members or delisting returns.
+
+For each ticker, the last record on a duplicate date is retained. Let $P_{it}$ denote adjusted close and $D_{it}$ denote provider close times reported volume. Adjusted close is forward filled for at most three panel rows. Simple returns are
+\[
+ r_{it}=\operatorname{clip}(P_{it}/P_{i,t-1}-1,-0.5,0.5),\qquad
+ V_{it}=\operatorname{median}_{21}(D_i)_t.
+\]
+The percentage change has no further implicit filling. The median requires at least 10 observations. We use $V$ as a trailing daily dollar-volume estimate. It is a median, although the implementation calls it ADV. All row counts below refer to the common panel calendar.
+
+Define $\ell_{it}=\log P_{it}$ and $m_t$ as the mean available return across retained tickers. For any base feature $x$, its stored transform is
+\[
+ z_{it}(x)=\operatorname{rank}_{t}(x_{it})/n_t(x)-\tfrac12 .
+\]
+Here $n_t(x)$ is the number of nonmissing feature values on date $t$. Ties receive average ranks. Missing values remain missing. Table~\ref{tab:features} gives the 19 raw formulas. Every named rolling window requires its full number of nonmissing observations, except $V$, which retains its 10-of-21 rule. The deepest composed feature, residual volatility, requires 314 rows after a ticker's first bar.
+
+\input{finance-feature-table}
+
+The other ten features use the stored ranks directly. They are not ranked again. Five are $z(x)^2-1/12$ for $x\in\{\texttt{mom252},\texttt{rev1},\texttt{vol21},\texttt{p52w},\texttt{ladv}\}$. Five are products for the ordered pairs
+\[
+\begin{gathered}
+ (\texttt{mom252},\texttt{vol21}),\quad(\texttt{rev1},\texttt{vol21}),\quad
+ (\texttt{mom21},\texttt{ladv}),\\
+ (\texttt{p52w},\texttt{amihud}),\quad(\texttt{mom252},\texttt{rev1}).
+\end{gathered}
+\]
+The feature order is the table order, followed by the five squares in the order above, then the five products in the order above. This order determines the seeded random feature sets.
+
+The static universe restrictions precede feature construction. The daily trading-validity mask follows feature construction and feature ranking. Thus $m_t$ and a daily feature rank can include a retained ticker that later fails that day's trading rules. A ticker on a given date is valid only if all 29 features and its return are present, $V_{it}>2\times10^6$, and $P_{it}>5$. The last test uses adjusted close. It is a retrospective adjusted-price screen, not a verified historical nominal USD 5 screen. Missing numeric array entries are stored as zero beside the validity mask. Features are multiplied by that mask before estimation and scoring. No industry adjustment, feature winsorization, or feature z-score is applied. The return clip occurs before feature construction.
+
+\section{Configurations and pooled ridge forecasts}\label{sec:fit}
+Each configuration has six axes. Their Cartesian product has
+$4\times4\times4\times25\times5\times3=24{,}000$ entries within each pool's feature-set realization.
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Axis & Values\\
+\midrule
+Forecast horizon $h$ & $1,5,10,21$ rows\\
+Training window $W$ & $252,504,756,1260$ rows\\
+Ridge parameter $\lambda$ & $10^{-3},10^{-2},10^{-1},1$\\
+Feature set $S$ & 11 named sets and 14 seeded random sets\\
+Score half-life $H$ & $0,2,5,10,21$ rows\\
+Portfolio transform & \texttt{rank}, \texttt{q20}, \texttt{q10}\\
+\bottomrule
+\end{tabular}
+\end{center}
+Pools A and D contain 500 configurations each. Pools B and C contain 1,500 each. Their NumPy default-generator seeds are 11, 202, 303, and 404, respectively. The generator first constructs all 14 random feature sets. Each set draws its size uniformly from the integers 6 through 19, then draws that many feature indices without replacement and sorts them. Sets are drawn separately. Duplicate sets are not rejected. Their overlaps are not constrained.
+
+For completeness, let $\mathcal L$ be all 19 base features and $\mathcal N$ all ten nonlinear features. The four primitive groups are
+\begin{align*}
+\mathcal M={}&\{\texttt{mom21},\texttt{mom63},\texttt{mom126},\texttt{mom252},
+\texttt{accel},\texttt{ma50},\texttt{ma200},\texttt{p52w}\},\\
+\mathcal R={}&\{\texttt{rev1},\texttt{rev5},\texttt{maxr21},\texttt{skew63}\},\\
+\mathcal K={}&\{\texttt{vol21},\texttt{vol63},\texttt{ivol},\texttt{beta}\},\\
+\mathcal Q={}&\{\texttt{ladv},\texttt{dvolz},\texttt{amihud}\}.
+\end{align*}
+In insertion order, the named feature sets are $\mathcal L$, $\mathcal L\cup\mathcal N$, $\mathcal M\cup\mathcal R\cup\mathcal N$, $\mathcal M$, $\mathcal R$, $\mathcal K$, $\mathcal Q$, $\mathcal M\cup\mathcal R$, $\mathcal M\cup\mathcal K$, $\mathcal R\cup\mathcal Q$, and $\mathcal L\setminus\mathcal Q$. The corresponding names are \texttt{lin\_all}, \texttt{all}, \texttt{nl\_only}, \texttt{mom}, \texttt{rev}, \texttt{risk}, \texttt{liq}, \texttt{mom+rev}, \texttt{mom+risk}, \texttt{rev+liq}, and \texttt{no\_liq}. Despite its name, \texttt{nl\_only} includes linear momentum and reversal features. The 14 random sets follow these named sets.
+
+After constructing the sets, the same generator samples one value from each axis in the table, in table order. A repeated six-axis configuration is rejected. Sampling continues until the required pool size is reached. Named sets are common across pools. Random sets depend on the pool seed. Thus the four pools are configuration draws on one shared market history, not independent market replications.
+
+The aligned label at origin $s$ is the forward log return from the next fill close over $h$ rows,
+\[
+ g_{is}^{(h)}=\sum_{u=s+2}^{s+1+h}\log(1+r_{iu}).
+\]
+The label is included when the trading-validity masks at $s+1$ and $s+1+h$ are both true. Intermediate masks are not tested. Since missing returns are stored as zero, an intermediate missing return contributes zero when both endpoint tests pass. On each origin date, included labels are centered and divided by their population standard deviation. If at most 20 names qualify, or that standard deviation is zero, all labels on that origin are set to zero. Write the standardized labels as $y_{is}$. Labels overlap across origins. The feature vector at origin $s$ is separately zeroed if $s$ is invalid.
+
+Refits occur every 21 rows, anchored at 1 July 2004, the first scoring row. The coefficients remain fixed between refits. At refit row $t$, set $e=t-h-1$. The included origins are exactly $e-W+1,\ldots,e$. The last label ends at close $t$. Full training windows are required. There is no additional embargo. The shifted endpoint counts in the retained US calculation exceed 20 throughout the included training dates. The smallest count is 129 across the 265 refits.
+
+Let $x_{is,S}$ be the selected feature vector after its origin validity mask, and let $a_{is}^{(h)}$ indicate the two valid label endpoints. Define
+\[
+ M_t=\sum_{s=e-W+1}^{e}\sum_i a_{is}^{(h)}x_{is,S}x_{is,S}^{\mathsf T},\qquad
+ b_t=\sum_{s=e-W+1}^{e}\sum_i a_{is}^{(h)}x_{is,S}y_{is}.
+\]
+The fitted coefficient solves
+\[
+ \left[M_t+\lambda\left\{\operatorname{tr}(M_t)/|S|+10^{-12}\right\}I\right]
+ \widehat\beta_t=b_t.
+\]
+There is no intercept, observation weighting, or training-window feature standardizer. The penalty is scaled by the mean diagonal of the Gram matrix, not by a separately normalized sample count. Cumulative Gram matrices use double precision. Each refit uses a direct linear solve. A singular solve returns zero coefficients. Stored features and scores use single precision.
+
+The raw forecast is $f_{it}=x_{it,S}^{\mathsf T}\widehat\beta_t$ and is missing on invalid rows. For $H>0$, forecasts use the pandas exponentially weighted mean with $\alpha=1-0.5^{1/H}$, \texttt{min\_periods=1}, \texttt{ignore\_na=True}, and the default adjusted-weight convention. $H=0$ bypasses smoothing. Smoothing precedes portfolio formation. The validity mask is applied again before daily score ranks are computed.
+
+\section{Target holdings, fills, and daily outcomes}\label{sec:execution}
+Let $\rho_{it}$ be the percentile rank of a valid smoothed forecast. Define the preliminary score by
+\[
+ a_{it}=\begin{cases}
+ \rho_{it}-0.5,&\texttt{rank},\\
+ \ind\{\rho_{it}\geq0.8\}-\ind\{\rho_{it}\leq0.2\},&\texttt{q20},\\
+ \ind\{\rho_{it}\geq0.9\}-\ind\{\rho_{it}\leq0.1\},&\texttt{q10}.
+ \end{cases}
+\]
+Set missing scores to zero. Subtract the mean score over valid names and divide by the sum of absolute demeaned scores, floored at $10^{-9}$. This gives target holdings $w_{it}$ with zero net exposure and unit gross exposure when the row is nondegenerate. An all-zero row stays zero. The long and short legs are not normalized separately. Under the quantile transforms, unequal tail counts can give small nonzero weights to middle-ranked names after demeaning. There is no maximum name weight, sector constraint, beta constraint, covariance model, or volatility target.
+
+All holdings are dollar notionals divided by fixed target capital $A$. They are not fractions of current wealth. A decision uses information through close $t$. Its fill is at the next-close boundary, $t+1$. Its post-fill holdings earn the return $r_{i,t+2}$ from close $t+1$ to close $t+2$. The final two decision rows without a subsequent realized return are excluded. The last scored decision date is 22 July 2026.
+
+Holdings start at zero on 1 July 2004. Before each trade, previous holdings are marked to market, so $v_{it}=\widehat w_{i,t-1}(1+r_{i,t+1})$. Let $d_{it}=w_{it}-v_{it}$ be the gap to the new target and $\overline V_{it}=\max(V_{it},10^6)$ the execution volume input. Execution is
+\[
+ e_{it}=\operatorname{clip}\left(d_{it},-\kappa \overline V_{it}/A,\kappa \overline V_{it}/A\right),
+ \qquad \widehat w_{it}=v_{it}+e_{it},\qquad \kappa=0.10.
+\]
+The uncapped gross state uses an infinite cap and no charge. Other states use $A\in\{25,100,500,2000\}$ million USD. There is no persistent order queue. A remaining gap is reconsidered against the next target. An ineligible name can retain an old position while its exit is capped. There is no residual-net hedge.
+
+Cost inputs end at the signal close $t$. The engine floors $V$ at USD $10^6$. Its volatility $\sigma_{it}$ is the sample standard deviation of valid returns over 21 rows, with at least ten observations. Missing volatility is set to 0.02. Volatility is then clipped to $[0.005,0.15]$. Let
+\[
+ G_t=\max\left(\sum_i|\widehat w_{it}|,10^{-9}\right),\qquad
+ p_{it}=|e_{it}|A/\overline V_{it}.
+\]
+The stored daily components are
+\begin{align*}
+ R_t^{g}(A)&=G_t^{-1}\sum_i\widehat w_{it}r_{i,t+2},\\
+ T_t(A)&=G_t^{-1}\sum_i|e_{it}|,\qquad
+ I_t(A)=G_t^{-1}\sum_i\sigma_{it}|e_{it}|\sqrt{p_{it}},\\
+ R_t^{n}(A)&=R_t^{g}(A)-sT_t(A)-\eta I_t(A),
+ \quad s=1.5\times10^{-4},\quad\eta=0.5.
+\end{align*}
+These are held-gross-normalized series. Spread and impact change charges but do not change the executed holdings at a fixed $A$ and $\kappa$. The square-root impact is an assumed scenario, consistent with common impact models \citep{almgren2005direct,toth2011anomalous}. It is not calibrated to observed fills in this study.
+
+Partial fills can leave nonzero net exposure. Financing, stock-borrow charges, margin requirements, and wealth-based position reduction are absent. Diagnostic cash pays for trades and the default modeled charges. Cash and diagnostic wealth do not feed back into targets, caps, or return normalization. Negative diagnostic wealth does not terminate a path. Therefore these series do not give the return or excess return of a funded investor account.
+
+\section{Selection curves, remedies, and resampling}\label{sec:uncertainty}
+The primary selection window is $[\text{4 January 2010},\text{2 January 2019})$ in decision-date space. Evaluation starts on 2 January 2019 and ends at the last scored row. Models and holdings continue through these boundaries. There is no reset to cash at the evaluation boundary. Each configuration uses the same scored dates.
+
+For a daily series $R$, its reported Sharpe is $\sqrt{252}\,\overline R/\operatorname{sd}(R)$ with population standard deviation. A zero standard deviation gives zero Sharpe. No risk-free return is subtracted. The baseline ranking maximizes selection-window uncapped gross Sharpe. For each fixed ranking, exact without-replacement rank weights give expected selected evaluation Sharpe at $N\in\{1,2,4,8,16,32\}$. A fitted slope $\Lambda$ is the ordinary least-squares coefficient against $\log_2N$, with an intercept. It describes the six-point grid. It does not assert an equal effect at every doubling.
+
+For completeness, rank a pool of $m$ candidates from best to worst by the selection score. The implementation sorts scores in ascending order with a stable sort. The later stored configuration wins an exact tie. The rank convention here reverses that order, so rank 1 is best. Under uniform sampling without replacement, the probability that rank $k$ wins is
+\[
+ p_N(k)=\frac{\binom{m-k}{N-1}}{\binom{m}{N}},\qquad 1\leq k\leq m.
+\]
+A binomial coefficient is zero when its lower argument exceeds its upper argument. A candidate wins if it is sampled and all other sampled candidates have worse ranks. For any fixed candidate quantity $v_k$, the selected mean is $\sum_k p_N(k)v_k$. This standard order-statistic calculation requires no Monte Carlo sampling of searches \citep{oneill2023order}. The code evaluates the weights with log-gamma functions and normalizes their sum. The identity is exact; the numerical evaluation uses floating-point arithmetic.
+
+The same weights give expected turnover and the probability that the selected candidate has positive evaluation Sharpe. A selected median is the first outcome value whose cumulative winner probability reaches one half after ordering outcomes by value. These are summaries of candidate outcomes. In particular, expected candidate Sharpe is not the Sharpe of an averaged portfolio. The primary grid searches at most 10\% of each pool. This is a study-design restriction, not a restriction of the rank identity.
+
+
+At each positive capital, four paths are evaluated in this order. They are uncapped gross, capped gross, capped with spread, and capped with spread and impact. Write their fitted slopes as $\Lambda_0,\Lambda_c,\Lambda_s,\Lambda_n$. The total gap slope is $\Gamma=\Lambda_0-\Lambda_n$. Its capacity-related component is
+\[
+ \Gamma_{\rm cap}=(\Lambda_0-\Lambda_c)+(\Lambda_s-\Lambda_n).
+\]
+This ordered attribution separates the spread step from capping and impact. It is not a unique decomposition of cash costs. The signed Sharpe gap can be negative. Positive and negative local rank contributions can cancel.
+Here capacity means the effect of a fixed target capital on the participation limit and modeled price impact. It is not a measured maximum investment size. The adjacent slope differences add to the total because the intermediate slopes cancel. A positive gap slope means that the difference between gross and net Sharpe grows. It does not by itself mean that net Sharpe falls.
+
+The exploratory remedy keeps the same best-of-$N$ rule and changes its selection score. For assumed capital $A'\in\{25,100,500\}$ million USD, one score is selection-period net Sharpe at $A'$. The calibrated turnover score is
+\[
+ c_i(A')=S_i^{g,\mathrm{sel}}-\gamma(A')\,\overline T_i^{\mathrm{sel}}(A'),
+ \qquad
+ \gamma(A')=
+ \frac{m^{-1}\sum_i\{S_i^{g,\mathrm{sel}}-S_i^{n,\mathrm{sel}}(A')\}}
+ {\max\{m^{-1}\sum_i\overline T_i^{\mathrm{sel}}(A'),10^{-12}\}}.
+\]
+Calibration is separate for each pool and assumed capital. It uses selection-window gross Sharpe, modeled net Sharpe, and executed turnover. Thus this penalty requires the execution model. It is not a model-free turnover correction. The report averages expected net Sharpe at $N=32$ over four pools, three assumed capitals, and three evaluation capitals, for 36 equally weighted cells. The cells share market paths and candidates. Their mean is not an estimate from 36 independent deployments.
+
+A useful deterministic limit concerns score error. Suppose $|\widehat u_i-u_i|\leq\epsilon$ for every candidate in a subset. If $a$ maximizes $u$ and $b$ maximizes $\widehat u$, then
+\[
+ u_a-u_b=(u_a-\widehat u_a)+(\widehat u_a-\widehat u_b)
+                  +(\widehat u_b-u_b)\leq2\epsilon.
+\]
+The study does not measure this uniform bound for Sharpe. A bound on dollar-cost error alone would not establish it.
+
+Both finance resampling analyses use 1,000 stationary block replicates and 2.5th and 97.5th percentiles. The percentile interval contains the middle 95\% of the replicate values. A stationary index vector starts at a uniform day. Each next position either continues the current consecutive block, with circular wraparound, or restarts at a uniform day with probability $1/L$. The primary mean block length is $L=21$. Selection and evaluation have separate index vectors. Within a window, all candidates use the same vector. The bootstrap resamples stored daily outcome components. It does not reconstruct prices, refit the ridge models, regenerate portfolios, or rerun fills.
+
+For the pool-B gap interval, joint resampling recomputes selection Sharpe, rankings, rank weights, and slopes. Evaluation-only resampling holds the selection ranking fixed. The base seed is 20260807. For each mode and block length, the implementation initializes NumPy's default generator with $20260807+L$, hence 20260828 at $L=21$. Within each joint replicate, evaluation indices are drawn before selection indices. The block-length sensitivities use $L\in\{5,10,21,63\}$.
+
+The remedy uses seed 20260825 and $L=21$. It draws selection indices before evaluation indices. The same two index vectors are shared across all pools, candidates, and selectors. Each replicate recomputes selection Sharpes, turnover, $\gamma$, rankings, and paired differences in the 36-cell mean. The intervals are descriptive resampling intervals conditional on the stored models, execution assumptions, and observed history. They are not validated population confidence guarantees. The gap's joint interval includes zero. The remedy's mean net Sharpe remains negative under both cost-aware scores.
+
+\subsection{Complete exploratory selector comparison}\label{sec:all-selectors}
+Table~\ref{tab:all-selectors} lists all seven tested rules. The two simulator-free penalty coefficients are variants of one rule. All values come from retained aggregate records for the marked-to-market simulation. The accompanying \texttt{data/finance\_additional\_checks.json} preserves those records, their source hashes, and the arithmetic used for the summaries. Only the net-score and calibrated-turnover rules have paired gain intervals. These comparisons are exploratory.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Selection rule & Mean net Sharpe & Gain over gross selection\\
+\midrule
+Gross Sharpe & $-0.501$ & $0.000$\\
+Turnover decile screen & $-0.298$ & $+0.203$\\
+Simulator-free penalty, $\eta_{\rm ref}=0.5$ & $-0.169$ & $+0.332$\\
+Simulator-free penalty, $\eta_{\rm ref}=0.11$ & $-0.229$ & $+0.272$\\
+Calibrated turnover penalty & $-0.048$ & $+0.453$\\
+Net Sharpe at assumed capital & $-0.071$ & $+0.430$\\
+Deflated net Sharpe at assumed capital & $-0.071$ & $+0.430$\\
+Ex-post evaluation oracle & $+0.220$ & $+0.721$\\
+\bottomrule
+\end{tabular}
+\caption{The full retrospective comparison at $N=32$ uses the same 36 equally weighted pool-by-assumed-by-evaluation-capital cells. All non-oracle rules have negative mean net Sharpe. The oracle uses the evaluation outcomes and is unavailable at selection. The simulator-free penalty uses full-panel universe summaries. Thus this table is not a comparison of seven verified selection-window-only policies.}
+\label{tab:all-selectors}
+\end{table}
+\FloatBarrier
+
+Gross selection ranks the full pool by selection-period uncapped Sharpe. The turnover decile screen first removes candidates above the 90th percentile of selection-period executed turnover at the assumed capital. It then applies gross selection to the retained pool. This rule needs the fill model, even though its score uses no cost charge. The calibrated turnover penalty uses the coefficient defined above. The net-score rule uses selection-period net Sharpe at the assumed capital.
+
+The simulator-free penalty ranks gross Sharpe minus $\gamma_{\rm sf}$ times desired turnover. Here desired turnover is turnover on the uncapped portfolio path. Its coefficient is
+\[
+ \gamma_{\rm sf}(A')=
+ \frac{\sqrt{252}\{s+\eta_{\rm ref}\sigma_{\rm name}
+           \sqrt{\tau A'/(n_{\rm live}V_{\rm med})}\}}
+      {\sigma_{\rm book}}.
+\]
+Here $\tau$ is pool-median selection-period desired turnover. The denominator is the median selection-period daily volatility of the uncapped books. The other inputs summarize the full stored panel. They are median name volatility $\sigma_{\rm name}=0.01699$, median daily dollar volume $V_{\rm med}=151.75$ million USD, and mean valid-name count $n_{\rm live}=218.86$. These summaries can include evaluation dates. Thus the stored rule is retrospective. Its selection score needs no simulated fill path, but its reported net outcome still needs the simulator. The lower coefficient matches the temporary-impact form $0.142\sigma p^{0.6}$ to $\eta\sigma p^{1/2}$ at $p=0.10$ \citep{almgren2005direct}. The matching coefficient is $\eta(p)=0.142p^{0.1}$: about $0.113$ at $p=0.10$ and $0.071$ at $p=0.001$. The sensitivity uses the rounded value $0.11$. Both reference coefficients, $0.5$ and $0.11$, are retained in Table~\ref{tab:all-selectors}.
+
+The deflated-net rule applies the Deflated Sharpe Ratio \citep{bailey2014deflated} to each selection-period net series. Let $z_i$ be its daily Sharpe, $s_z$ the sample standard deviation of $z_i$ across candidates, and $n$ the common observation count. Let $a_i$ and $b_i$ be the series' skewness and non-excess kurtosis. Non-excess kurtosis is 3 for a normal distribution. The trial count is 32. With $c_E=0.5772156649$ and standard normal distribution function $\Phi$, the implemented score is
+\[
+ z_* = s_z\{(1-c_E)\Phi^{-1}(1-1/32)+c_E\Phi^{-1}(1-1/(32e))\},
+\]
+\[
+ \operatorname{DSR}_i=\Phi\!\left(
+ \frac{(z_i-z_*)\sqrt{\max(n-1,1)}}
+ {\sqrt{\max\{1-a_i z_i+(b_i-1)z_i^2/4,10^{-8}\}}}\right).
+\]
+This score changes the ranking rather than only attaching a warning to a fixed winner. Its mean selected net Sharpe is $-0.071231$, compared with $-0.071205$ for net selection. Equal values at three decimal places do not establish identical rankings or identical winners for every subset. The ex-post oracle ranks candidates by evaluation-period net Sharpe at the evaluation capital. It gives the best possible winner within each sampled subset for this recorded outcome. It is a diagnostic upper bound, not a usable selector.
+
+\subsection{Reported sensitivity checks}\label{sec:finance-inventory}
+Table~\ref{tab:finance-inventory} gives the other tested checks and their negative outcomes. Unless stated otherwise, the values use the same marked-to-market recursion as the primary results. The data file preserves full aggregate rows, including cells outside the displayed capital range. The stored sign convention is $D=-\Gamma$ and $D_{\rm capacity}=-\Gamma_{\rm cap}$. Interval endpoints reverse order when their signs are changed. Gross slopes and selector gains retain their recorded signs.
+
+\begin{longtable}{@{}p{0.25\linewidth}p{0.70\linewidth}@{}}
+\caption{Retained finance checks and their scope. Counts describe dependent scenarios on shared data. They do not estimate success probabilities across deployments.}\label{tab:finance-inventory}\\
+\toprule
+Check & Retained result and interpretation\\
+\midrule
+\endfirsthead
+\toprule
+Check & Retained result and interpretation\\
+\midrule
+\endhead
+Gross-slope uncertainty & Pool B has $\Lambda_{\rm gross}=0.0153$. At $L=21$, its joint interval is $[-0.0438,0.0678]$. The evaluation-only interval is $[-0.0240,0.0558]$. Both include zero. More search does not establish a positive gross-Sharpe gain under these resampling designs.\\
+Gap uncertainty & Joint and evaluation-only modes, four block lengths $5,10,21,63$, and the recorded capital levels are retained. The joint $L=21$ interval for $\Gamma_{\rm cap}(500\mathrm{M})$ is $[-0.0219,0.1209]$. It includes zero.\\
+Search grids & Five grids anchored at $N=1$ give 64 eligible pool-by-grid-by-capital cells. All have positive $\Gamma_{\rm cap}$. Their 500M range is $[0.0172,0.0571]$. This count excludes the separate late-start check. Pool A on $\{8,16,32\}$ has $\Gamma_{\rm cap}(500\mathrm{M})=-0.0070$.\\
+Execution factorial & The tested participation limits are $0.05,0.10,0.20$. Spreads are $0.75,1.5,3$ basis points. Impact coefficients are $0.25,0.5,1$. All 324 cells at 25M, 100M, and 500M have positive $\Gamma_{\rm cap}$. The 500M range is $[0.0069,0.1106]$. Across all three capitals the lower endpoint is $0.0036$.\\
+Walk-forward periods & Six selection--evaluation pairs give 72 pool-by-period-by-capital cells. Of these, 65 have positive $\Gamma_{\rm cap}$. The 500M range is $[-0.0096,0.2418]$. Only 16 of 24 pool-by-period gross slopes are positive. Net selection at assumed 25M improves the level and slope in all 72 cells.\\
+Cost misspecification & The 2,916 paired execution scenarios use assumed capital 25M and evaluation capital 500M. All have positive net-score gains over gross selection. The minimum is $0.1234$. These are scenario comparisons, not independent confirmations.\\
+Impact coefficient & The temporary-impact mapping $\eta(p)=0.142p^{0.1}$ gives about $0.11$ at $p=0.10$ and $0.07$ at $p=0.001$. At $\eta=0.11$, all 12 pool-by-capital cells at 25M, 100M, and 500M have positive $\Gamma_{\rm cap}$. The 500M range is $[0.0052,0.0106]$. Other retained coefficients include $0.07,0.25,0.5,1$.\\
+Impact exponent & Replacing $p^{1/2}$ by $p^{0.6}$ and matching charges at $p=0.10$ gives $\eta_{0.6}=0.62946$. The 500M $\Gamma_{\rm cap}$ range becomes $[0.0168,0.0424]$. Mean net-score gain falls from $0.4298$ to $0.3781$. The full-pool top gross and net-score candidate IDs stay the same in all 12 pool-by-assumed-capital cases. This does not imply that every subset winner stays the same.\\
+Exposure diagnostics & Under gross selection at $N=32$ and 500M, pool ranges of expected evaluation-period means are $[0.9947,0.9969]$ for held gross exposure and $[0.0104,0.0122]$ for absolute net exposure, in target-capital units. At least one trade hits its cap on $83.0$--$86.2\%$ of days. Mean diagnostic wealth ranges from $-1.2275$ to $-0.6305$. These are not daily quantiles or funded-account returns.\\
+Rank-gradient checks & All five adjacent doublings are retained for pool B and the lowest-liquidity tercile. At 16 to 32, positive and negative local sums are $11.9492$ and $-11.8823$ in B. Their total is $0.0669$. In the tercile, the sums are $16.3527$ and $-16.3036$, with total $0.0491$. Large local terms cancel.\\
+Liquidity terciles & The retained three-tercile check has positive $\Gamma_{\rm cap}$ in six of nine cells. At 500M the low-, middle-, and high-liquidity values are $0.0968,-0.0279,0.0334$. The middle tercile reverses the sign. Terciles use full-panel median liquidity. They are retrospective groups, not a test of survivor-complete data.\\
+Turnover association & Primary-pool score--desired-turnover Spearman correlations range from $0.233$ to $0.307$. Across the 24 pool-by-period cells, ten correlations are negative. The turnover-product term explains $0.886$--$1.199$ times the primary 500M capacity component, with a nonzero residual. It is an algebraic attribution, not an identified cause.\\
+Monotonicity and influence & The recorded gap-curve monotonicity check passes in 12 of 16 positive-capital primary cells and 29 of 72 walk-forward cells. All four primary failures are in pool A. Removing the candidate with the worst evaluation Sharpe changes the primary $\Gamma_{\rm cap}$ by at most $8.6\%$, with no sign reversal. The walk-forward relative change is below $20\%$ in 65 of 72 cells. Pool D at 25M has a net slope of $0.000665$ before removal and $0.000076$ after removal, an $88.6\%$ relative change. A small change in the gap does not imply a small relative change in a near-zero net slope.\\
+\bottomrule
+\end{longtable}
+
+The execution factorial crosses three participation limits, three spreads, and three impact coefficients. These give 27 settings for each pool and capital. The cost-misspecification check crosses the same 27 assumed settings with all 27 evaluation settings. It selects on net Sharpe at assumed capital USD 25 million and evaluates at USD 500 million. Four pools give $4\times27\times27=2{,}916$ comparisons at $N=32$.
+
+The walk-forward selection periods start in July 2004, 2007, 2010, 2013, 2016, and 2019. Each lasts three years. Evaluation starts at the end of its paired selection period. The first five evaluation periods last three years. The last continues through the stored July 2026 endpoint. The selection windows are disjoint. The evaluation windows are also disjoint. However, earlier evaluation dates enter later selection windows. The period comparisons also combine changes in market conditions and liquidity. They do not isolate either cause.
+
+
+The five anchored search grids are $\{1,2,4,8\}$, $\{1,2,4,8,16\}$, $\{1,2,4,8,16,32\}$, $\{1,2,4,8,16,32,64\}$, and $\{1,2,4,8,16,32,64,128\}$. The 10\% rule admits the first three grids in pools A and D and all five in pools B and C. Four capital levels therefore give 64 cells. For each influence check, the candidate with the lowest evaluation Sharpe is removed. All four slope paths and rank weights are then recomputed on the reduced pool. This is a sensitivity analysis that uses evaluation outcomes, not a selection rule.
+
+For the turnover attribution, define each candidate's capacity-related gap as uncapped gross Sharpe minus capped gross Sharpe, plus spread-only Sharpe minus net Sharpe. Regress this gap on evaluation-period mean executed turnover, with an intercept. Apply the winner weights separately to turnover and the regression residual. Linearity gives the gap slope as the regression coefficient times the selected-turnover slope, plus the selected-residual slope. The constant intercept contributes no slope. This decomposition is an identity within the recorded pool. It does not identify a causal effect of turnover.
+
+The monotonicity check tests whether the expected gross-minus-net gap increases at every adjacent point of the six-point search grid, allowing a numerical tolerance of $10^{-15}$. It does not test whether candidate-level gaps are monotone in proxy rank.
+
+The lowest-liquidity rank-gradient check uses pool B's configuration design with training and trading restricted to the lowest third of names by full-panel median dollar volume. The stored feature ranks remain full-universe ranks. This check does not reconstruct missing or delisted names. The exposure diagnostics use exact winner probabilities to average candidate-level time means. Daily exposure medians and 95th percentiles were not retained for this comparison. All sensitivity gains remain conditional on the chosen impact functions and stored price path. None validates modeled charges against observed fills.
+
+\section{Retrospective status and limits}\label{sec:status}
+The finance study uses no untouched market holdout. The selection-score comparisons and additional sensitivities are exploratory. Resampling specifications were recorded before the corresponding resampling outputs were inspected. This order does not remove prior outcome inspection or make the study externally preregistered.
+
+The configurations have no demonstrated trading advantage. Mean candidate evaluation Sharpe before costs is negative in all four pools. Every non-oracle selection rule in Table~\ref{tab:all-selectors} has negative mean net Sharpe. The joint gap interval and the gross-slope interval include zero. More pools, capital levels, and execution settings on the same price history do not provide independent market evidence.
+
+The survivor-filtered universe omits missing and delisted price histories. Modeled charges are not validated against observed fills. The reported series use held gross exposure for normalization and omit financing and stock-borrow charges. They therefore do not describe a funded investor account. The effect also depends on the search grid, period, and liquidity group, as the negative cases in Table~\ref{tab:finance-inventory} show.
+
+The finite-pool rank weights apply to any fixed candidate quantity under the stated sampling rule. They do not establish the direction of an omitted-cost effect in another domain. Such a test would need a specified deployment objective, candidate-level measurements of the omitted term, and a check of its relation to proxy rank under selection-data resampling.
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+\end{document}

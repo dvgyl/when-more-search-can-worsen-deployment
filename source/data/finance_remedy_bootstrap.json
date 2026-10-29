@@ -1,0 +1,56 @@
+{
+  "status": "post_hoc_exploratory",
+  "estimand": "36-cell mean absolute Sharpe improvement",
+  "N": 32,
+  "pools": [
+    "A",
+    "B",
+    "C",
+    "D"
+  ],
+  "assumed": [
+    "25M",
+    "100M",
+    "500M"
+  ],
+  "actual": [
+    "25M",
+    "100M",
+    "500M"
+  ],
+  "cells": 36,
+  "stationary_bootstrap": {
+    "reps": 1000,
+    "mean_block": 21,
+    "seed": 20260825,
+    "windows": "selection and evaluation resampled separately",
+    "pairing": "same day counts across pools, candidates, and selectors"
+  },
+  "point": 0.42975754275006317,
+  "mean": 0.41859764770035757,
+  "sd": 0.13769222083080643,
+  "lo95": 0.19173527018088324,
+  "hi95": 0.7227217751293026,
+  "frac_positive": 1.0,
+  "frac_negative": 0.0,
+  "estimands": {
+    "net_score": {
+      "point": 0.42975754275006317,
+      "mean": 0.41859764770035757,
+      "sd": 0.13769222083080643,
+      "lo95": 0.19173527018088324,
+      "hi95": 0.7227217751293026,
+      "frac_positive": 1.0,
+      "frac_negative": 0.0
+    },
+    "turnover_penalty": {
+      "point": 0.453087360660436,
+      "mean": 0.42299876472656606,
+      "sd": 0.1364085331857233,
+      "lo95": 0.19793135648328802,
+      "hi95": 0.7281083769519273,
+      "frac_positive": 1.0,
+      "frac_negative": 0.0
+    }
+  }
+}
