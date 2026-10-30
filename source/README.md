@@ -16,7 +16,7 @@ python3 verify_finance.py
 
 The verifier uses only the Python standard library. It checks aggregate hashes, the 17 embedded CSV payloads, reported finance summaries and negative cases, figure inputs, and small-pool rank identities by exact enumeration. It does not fit models, simulate trades, or generate bootstrap draws. A successful check does not establish statistical validity or venue approval.
 
-The main document reads `abstract.tex` and `finance-remedy-table.tex`. The supplement reads `finance-feature-table.tex`. Figure 1 is included as `figures/finance-mechanism.pdf`. Regenerate it with the supplied input CSV files.
+The main document reads `abstract.tex`, `finance-remedy-table.tex`, and `checklist.tex`. The supplement reads `finance-feature-table.tex`. Figure 1 is included as `figures/finance-mechanism.pdf`. Regenerate it with the supplied input CSV files.
 
 ```sh
 python3 -m pip install -r requirements-figures.txt
@@ -42,6 +42,7 @@ README.md
 REPRODUCTION_DETAILS.md
 main.tex
 abstract.tex
+checklist.tex
 supplement.tex
 finance-feature-table.tex
 finance-remedy-table.tex
